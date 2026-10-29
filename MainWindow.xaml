@@ -1,0 +1,590 @@
+<Window x:Class="TekitouKeyborad.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="適当キーボード (TekitouKeyborad)"
+        Width="920" Height="680"
+        MinWidth="760" MinHeight="540"
+        Icon="pack://application:,,,/Assets/app.ico"
+        Background="{DynamicResource BgPrimaryBrush}"
+        Foreground="{DynamicResource TextPrimaryBrush}"
+        Closing="Window_Closing">
+
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- 上部ヘッダー領域 -->
+        <Border Grid.Row="0"
+                Background="{DynamicResource BgSurfaceBrush}"
+                BorderBrush="{DynamicResource BorderSubtleBrush}"
+                BorderThickness="1"
+                CornerRadius="12"
+                Padding="18,14"
+                Margin="0,0,0,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- アプリアイコン -->
+                <Image Grid.Column="0"
+                       Source="pack://application:,,,/Assets/app.ico"
+                       Width="42" Height="42"
+                       VerticalAlignment="Center"
+                       Margin="0,0,14,0"/>
+
+                <!-- タイトル＆ステータス -->
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock x:Name="AppTitleText"
+                                   Text="適当キーボード"
+                                   FontSize="20" FontWeight="Bold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        <TextBlock x:Name="VersionBadgeText"
+                                   Text="v1.0.0.0"
+                                   FontSize="11.5"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   VerticalAlignment="Bottom"
+                                   Margin="10,0,0,3"/>
+                    </StackPanel>
+                    <TextBlock x:Name="StatusBannerText"
+                               Text="待機中"
+                               FontSize="12.5"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Margin="0,3,0,0"
+                               TextTrimming="CharacterEllipsis"/>
+                </StackPanel>
+
+                <!-- ショートカット＆モデルバッジ -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Background="{DynamicResource BgCardBrush}"
+                            BorderBrush="{DynamicResource BorderSubtleBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="12,6"
+                            Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock x:Name="LblActiveShortcut"
+                                       Text="現在のショートカット"
+                                       FontSize="10.5"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock x:Name="BadgeShortcutText"
+                                       Text="Ctrl + Alt + K"
+                                       FontSize="13.5" FontWeight="Bold"
+                                       Foreground="{DynamicResource AccentPrimaryBrush}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{DynamicResource BgCardBrush}"
+                            BorderBrush="{DynamicResource BorderSubtleBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="12,6">
+                        <StackPanel>
+                            <TextBlock x:Name="LblActiveModel"
+                                       Text="使用中のモデル"
+                                       FontSize="10.5"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock x:Name="BadgeModelText"
+                                       Text="phi-3.5-mini"
+                                       FontSize="13.5" FontWeight="Bold"
+                                       Foreground="{DynamicResource SuccessBrush}"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- 全体プログレスバー -->
+        <ProgressBar x:Name="GlobalBusyBar"
+                     Grid.Row="1"
+                     Height="4"
+                     IsIndeterminate="True"
+                     Visibility="Collapsed"
+                     Foreground="{DynamicResource AccentPrimaryBrush}"
+                     Background="Transparent"
+                     BorderThickness="0"
+                     Margin="0,0,0,8"/>
+
+        <!-- ナビゲーション＆コンテンツ領域 -->
+        <Grid Grid.Row="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- タブ切り替えバー -->
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
+                <Button x:Name="NavHomeBtn"
+                        Content="ホーム・履歴"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        Click="NavHomeBtn_Click"
+                        Margin="0,0,8,0"/>
+                <Button x:Name="NavModelsBtn"
+                        Content="Foundry モデル管理"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Click="NavModelsBtn_Click"
+                        Margin="0,0,8,0"/>
+                <Button x:Name="NavSettingsBtn"
+                        Content="設定"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Click="NavSettingsBtn_Click"/>
+            </StackPanel>
+
+            <!-- ==================== 1. ホーム・履歴ビュー ==================== -->
+            <Grid x:Name="HomeView" Grid.Row="1" Visibility="Visible">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- テスト校正プレイグラウンド -->
+                <Border Grid.Row="0"
+                        Background="{DynamicResource BgSurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderSubtleBrush}"
+                        BorderThickness="1"
+                        CornerRadius="12"
+                        Padding="16"
+                        Margin="0,0,0,12">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="110"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0" Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="LblTestSectionTitle"
+                                       Text="テスト校正プレイグラウンド"
+                                       FontSize="14.5" FontWeight="Bold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <CheckBox x:Name="QuickAutoPasteCheck"
+                                      Grid.Column="1"
+                                      Content="校正後に自動で貼り付け (Ctrl+V)"
+                                      Checked="QuickAutoPasteCheck_Changed"
+                                      Unchecked="QuickAutoPasteCheck_Changed"/>
+                        </Grid>
+
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBox x:Name="TestInputBox"
+                                     Grid.Column="0"
+                                     AcceptsReturn="True"
+                                     TextWrapping="Wrap"
+                                     VerticalScrollBarVisibility="Auto"
+                                     Text="お世話になっております。明日の会議の資料を送付いたしますので、ご確認のほどよろしくおねがいします。"/>
+
+                            <TextBox x:Name="TestOutputBox"
+                                     Grid.Column="2"
+                                     AcceptsReturn="True"
+                                     IsReadOnly="True"
+                                     TextWrapping="Wrap"
+                                     VerticalScrollBarVisibility="Auto"/>
+                        </Grid>
+
+                        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+                            <Button x:Name="BtnRunProofread"
+                                    Content="テスト校正を実行"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Click="BtnRunProofread_Click"
+                                    Margin="0,0,8,0"/>
+                            <Button x:Name="BtnCopyResult"
+                                    Content="結果をコピー"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Click="BtnCopyResult_Click"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- 最近の校正履歴 -->
+                <Border Grid.Row="1"
+                        Background="{DynamicResource BgSurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderSubtleBrush}"
+                        BorderThickness="1"
+                        CornerRadius="12"
+                        Padding="16">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0" Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="LblHistoryTitle"
+                                       Text="最近の校正履歴"
+                                       FontSize="14.5" FontWeight="Bold"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <Button x:Name="BtnClearHistory"
+                                    Grid.Column="1"
+                                    Content="履歴をクリア"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Click="BtnClearHistory_Click"/>
+                        </Grid>
+
+                        <ListBox x:Name="HistoryListBox"
+                                 Grid.Row="1"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 HorizontalContentAlignment="Stretch"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 SelectionChanged="HistoryListBox_SelectionChanged">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{DynamicResource BgCardBrush}"
+                                            BorderBrush="{DynamicResource BorderSubtleBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="8"
+                                            Padding="12,8"
+                                            Margin="0,0,0,6">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+                                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,4">
+                                                <TextBlock Text="{Binding Timestamp, StringFormat={}{0:yyyy/MM/dd HH:mm:ss}}"
+                                                           FontSize="11"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           Margin="0,0,10,0"/>
+                                                <TextBlock Text="{Binding ModelName}"
+                                                           FontSize="11" FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource AccentPrimaryBrush}"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Row="1"
+                                                       Text="{Binding OriginalText}"
+                                                       FontSize="12"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       MaxHeight="20"
+                                                       Margin="0,0,0,3"/>
+                                            <TextBlock Grid.Row="2"
+                                                       Text="{Binding ProofreadText}"
+                                                       FontSize="13" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       TextWrapping="Wrap"
+                                                       MaxHeight="44"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- ==================== 2. Foundry モデル管理ビュー ==================== -->
+            <Border x:Name="ModelsView"
+                    Grid.Row="1"
+                    Visibility="Collapsed"
+                    Background="{DynamicResource BgSurfaceBrush}"
+                    BorderBrush="{DynamicResource BorderSubtleBrush}"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    Padding="16">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- ヘッダー説明 -->
+                    <StackPanel Grid.Row="0" Margin="0,0,0,10">
+                        <TextBlock x:Name="LblModelsHeaderTitle"
+                                   Text="Microsoft Foundry Local モデルカタログ"
+                                   FontSize="15" FontWeight="Bold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        <TextBlock x:Name="LblModelsHeaderDesc"
+                                   Text="ローカルPC上でオフライン推論を行うAIモデルをダウンロード・ロードします。"
+                                   FontSize="12.5"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Margin="0,3,0,0"/>
+                    </StackPanel>
+
+                    <!-- 操作ツールバー -->
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,10">
+                        <Button x:Name="BtnRefreshCatalog"
+                                Content="カタログ更新"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Click="BtnRefreshCatalog_Click"
+                                Margin="0,0,8,0"/>
+                        <Button x:Name="BtnDownloadRegisterEps"
+                                Content="GPU/NPU アクセラレーション(EP)を検出・登録"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Click="BtnDownloadRegisterEps_Click"/>
+                        <ProgressBar x:Name="ModelDownloadBar"
+                                     Width="180" Height="14"
+                                     Minimum="0" Maximum="100"
+                                     Visibility="Collapsed"
+                                     Margin="14,0,0,0"
+                                     VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <!-- モデル一覧リスト -->
+                    <ListBox x:Name="ModelsListBox"
+                             Grid.Row="2"
+                             Background="Transparent"
+                             BorderThickness="1"
+                             BorderBrush="{DynamicResource BorderSubtleBrush}"
+                             HorizontalContentAlignment="Stretch"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{DynamicResource BgCardBrush}"
+                                        BorderBrush="{DynamicResource BorderSubtleBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="8"
+                                        Padding="12,10"
+                                        Margin="0,3">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="2*"/>
+                                            <ColumnDefinition Width="2*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Alias}"
+                                                       FontWeight="Bold" FontSize="13.5"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock Text="{Binding TaskType}"
+                                                       FontSize="11"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding DisplayName}"
+                                                   VerticalAlignment="Center"
+                                                   FontSize="12.5"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Margin="6,0"/>
+                                        <TextBlock Grid.Column="2"
+                                                   Text="{Binding FileSizeMb, StringFormat={}{0} MB}"
+                                                   VerticalAlignment="Center"
+                                                   FontSize="12.5"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        <StackPanel Grid.Column="3" VerticalAlignment="Center">
+                                            <TextBlock Text="DL済:" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                            <TextBlock Text="{Binding CachedText}" FontWeight="SemiBold" FontSize="12.5" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="4" VerticalAlignment="Center">
+                                            <TextBlock Text="ロード済:" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                            <TextBlock Text="{Binding LoadedText}" FontWeight="SemiBold" FontSize="12.5" Foreground="{DynamicResource SuccessBrush}"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <!-- 選択モデルへの操作ボタン -->
+                    <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+                        <Button x:Name="BtnSelectAndLoad"
+                                Content="選択してロード"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Click="BtnSelectAndLoad_Click"
+                                Margin="0,0,8,0"/>
+                        <Button x:Name="BtnDownloadModel"
+                                Content="ダウンロード"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Click="BtnDownloadModel_Click"
+                                Margin="0,0,8,0"/>
+                        <Button x:Name="BtnUnloadModel"
+                                Content="アンロード"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Click="BtnUnloadModel_Click"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ==================== 3. 設定ビュー ==================== -->
+            <Border x:Name="SettingsView"
+                    Grid.Row="1"
+                    Visibility="Collapsed"
+                    Background="{DynamicResource BgSurfaceBrush}"
+                    BorderBrush="{DynamicResource BorderSubtleBrush}"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    Padding="18">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,8,0">
+                    <StackPanel>
+                        <!-- ショートカットキー設定 -->
+                        <TextBlock x:Name="LblSettingsShortcutHeader"
+                                   Text="ショートカットキー設定"
+                                   FontSize="15" FontWeight="Bold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        <TextBlock x:Name="LblSettingsShortcutDesc"
+                                   Text="入力欄をクリックし、登録したいキーの組み合わせ（例: Ctrl + Alt + K）を押してください。"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Margin="0,3,0,8"/>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,18">
+                            <TextBox x:Name="HotKeyRecorderBox"
+                                     Width="260"
+                                     IsReadOnly="True"
+                                     FontWeight="Bold"
+                                     TextAlignment="Center"
+                                     PreviewKeyDown="HotKeyRecorderBox_PreviewKeyDown"
+                                     Margin="0,0,10,0"/>
+                            <Button x:Name="BtnApplyShortcut"
+                                    Content="ショートカットを適用"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Click="BtnApplyShortcut_Click"/>
+                        </StackPanel>
+
+                        <!-- Microsoft Foundry 接続方式 -->
+                        <TextBlock x:Name="LblSettingsConnectionHeader"
+                                   Text="Microsoft Foundry 接続方式"
+                                   FontSize="15" FontWeight="Bold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   Margin="0,0,0,6"/>
+                        <RadioButton x:Name="RadioFoundrySdk"
+                                     Content="Foundry Local SDK (インプロセス直接実行・推奨)"
+                                     GroupName="ConnMode"
+                                     IsChecked="True"
+                                     Checked="ConnModeRadio_Changed"/>
+                        <RadioButton x:Name="RadioOpenAiEndpoint"
+                                     Content="OpenAI 互換ローカルエンドポイント (foundry service HTTP 経由)"
+                                     GroupName="ConnMode"
+                                     Checked="ConnModeRadio_Changed"/>
+
+                        <StackPanel x:Name="EndpointConfigPanel" Orientation="Horizontal" Margin="20,6,0,16" Visibility="Collapsed">
+                            <TextBlock x:Name="LblEndpointUrl"
+                                       Text="エンドポイントURL:"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,0,8,0"/>
+                            <TextBox x:Name="EndpointUrlBox" Width="380"/>
+                        </StackPanel>
+
+                        <!-- 校正プロンプト設定 -->
+                        <TextBlock x:Name="LblSettingsPromptHeader"
+                                   Text="校正プロンプト設定"
+                                   FontSize="15" FontWeight="Bold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   Margin="0,10,0,8"/>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <TextBlock x:Name="LblPreset"
+                                       Text="プリセット:"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Width="130"/>
+                            <ComboBox x:Name="PresetComboBox"
+                                      Width="320"
+                                      SelectionChanged="PresetComboBox_SelectionChanged">
+                                <ComboBoxItem Tag="Standard" Content="標準校正（誤字脱字・自然な文章）"/>
+                                <ComboBoxItem Tag="Business" Content="ビジネス丁寧語（敬語・メール向け）"/>
+                                <ComboBoxItem Tag="Concise" Content="簡潔・要約（無駄を省く）"/>
+                                <ComboBoxItem Tag="Custom" Content="カスタム指示"/>
+                            </ComboBox>
+                        </StackPanel>
+
+                        <TextBlock x:Name="LblSystemPrompt"
+                                   Text="システムプロンプト（AIへの指示）:"
+                                   FontSize="12.5"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Margin="0,4,0,4"/>
+                        <TextBox x:Name="SystemPromptBox"
+                                 Height="96"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"
+                                 Margin="0,0,0,10"/>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,18">
+                            <TextBlock x:Name="LblTemperature"
+                                       Text="Temperature (創造性):"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Width="160"/>
+                            <Slider x:Name="TemperatureSlider"
+                                    Width="200"
+                                    Minimum="0.0" Maximum="1.0"
+                                    SmallChange="0.05" LargeChange="0.1"
+                                    TickFrequency="0.1" IsSnapToTickEnabled="True"
+                                    VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding ElementName=TemperatureSlider, Path=Value, StringFormat={}{0:F2}}"
+                                       VerticalAlignment="Center"
+                                       Margin="10,0,0,0"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       FontWeight="SemiBold"/>
+                        </StackPanel>
+
+                        <!-- 動作・表示設定 -->
+                        <TextBlock x:Name="LblSettingsBehaviorHeader"
+                                   Text="動作・表示設定"
+                                   FontSize="15" FontWeight="Bold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   Margin="0,0,0,8"/>
+
+                        <CheckBox x:Name="ChkShowNotification" Content="校正完了時に画面右下にトースト通知を表示する"/>
+                        <CheckBox x:Name="ChkAutoPaste" Content="校正完了後に元のウィンドウへ自動貼り付け (Ctrl+V) する"/>
+                        <CheckBox x:Name="ChkStartMinimized" Content="アプリ起動時にシステムトレイへ最小化して開始する"/>
+                        <CheckBox x:Name="ChkCloseToTray" Content="ウィンドウを閉じる(×)ときに終了せずシステムトレイに常駐する"/>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,12,0,8">
+                            <TextBlock x:Name="LblLanguage"
+                                       Text="表示言語 (Language):"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Width="170"/>
+                            <ComboBox x:Name="LanguageComboBox" Width="260">
+                                <ComboBoxItem Tag="Auto" Content="自動 (Windowsの表示言語に従う)"/>
+                                <ComboBoxItem Tag="ja" Content="日本語 (Japanese)"/>
+                                <ComboBoxItem Tag="en" Content="英語 (English)"/>
+                            </ComboBox>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,4,0,18">
+                            <TextBlock x:Name="LblTheme"
+                                       Text="アプリのテーマ:"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Width="170"/>
+                            <ComboBox x:Name="ThemeComboBox" Width="260">
+                                <ComboBoxItem Tag="Auto" Content="自動 (Windowsのテーマ設定に従う)"/>
+                                <ComboBoxItem Tag="Light" Content="ライトモード (Light)"/>
+                                <ComboBoxItem Tag="Dark" Content="ダークモード (Dark)"/>
+                            </ComboBox>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button x:Name="BtnSaveSettings"
+                                    Content="設定を保存"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Click="BtnSaveSettings_Click"/>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>
