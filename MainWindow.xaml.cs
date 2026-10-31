@@ -4,6 +4,8 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Security;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -101,7 +103,8 @@ public partial class MainWindow : Window
             Height = s.WindowHeight;
         }
 
-        if (!double.IsNaN(s.WindowLeft) && !double.IsNaN(s.WindowTop))
+        if (s.WindowLeft is double left && double.IsFinite(left) &&
+            s.WindowTop is double top && double.IsFinite(top))
         {
             // 画面領域内に収まっているか検証する
             double vLeft = SystemParameters.VirtualScreenLeft;
@@ -109,12 +112,12 @@ public partial class MainWindow : Window
             double vWidth = SystemParameters.VirtualScreenWidth;
             double vHeight = SystemParameters.VirtualScreenHeight;
 
-            if (s.WindowLeft >= vLeft - 50 && s.WindowLeft < vLeft + vWidth - 100 &&
-                s.WindowTop >= vTop - 50 && s.WindowTop < vTop + vHeight - 100)
+            if (left >= vLeft - 50 && left < vLeft + vWidth - 100 &&
+                top >= vTop - 50 && top < vTop + vHeight - 100)
             {
                 WindowStartupLocation = WindowStartupLocation.Manual;
-                Left = s.WindowLeft;
-                Top = s.WindowTop;
+                Left = left;
+                Top = top;
             }
             else
             {
@@ -225,8 +228,8 @@ public partial class MainWindow : Window
 
         try
         {
-            string? selectedText = await TextCaptureAndPasteService.CaptureSelectedTextAsync();
-            if (string.IsNullOrWhiteSpace(selectedText))
+            var captured = await TextCaptureAndPasteService.CaptureSelectedTextAsync();
+            if (captured == null)
             {
                 StatusBannerText.Text = LocalizationService.Instance["StatusNoText"];
                 if (SettingsService.Current.ShowNotification)
@@ -236,7 +239,12 @@ public partial class MainWindow : Window
                 return;
             }
 
-            await ExecuteProofreadWorkflowAsync(selectedText, allowAutoPaste: SettingsService.Current.AutoPaste);
+            await ExecuteProofreadWorkflowAsync(captured.Text, allowAutoPaste: SettingsService.Current.AutoPaste,
+                pasteTarget: captured.Target);
+        }
+        catch (Exception ex)
+        {
+            ShowProofreadError(ex);
         }
         finally
         {
@@ -267,6 +275,10 @@ public partial class MainWindow : Window
 
             await ExecuteProofreadWorkflowAsync(clipText, allowAutoPaste: false);
         }
+        catch (Exception ex)
+        {
+            ShowProofreadError(ex);
+        }
         finally
         {
             _isBusyProofreading = false;
@@ -276,7 +288,7 @@ public partial class MainWindow : Window
     /// <summary>
     /// 校正の共通ワークフロー（Foundry推論 → クリップボード保存 → 履歴追加 → トースト表示 → 自動貼り付け）
     /// </summary>
-    private async Task ExecuteProofreadWorkflowAsync(string inputText, bool allowAutoPaste)
+    private async Task ExecuteProofreadWorkflowAsync(string inputText, bool allowAutoPaste, PasteTarget? pasteTarget = null)
     {
         var settings = SettingsService.Current;
         GlobalBusyBar.Visibility = Visibility.Visible;
@@ -291,12 +303,12 @@ public partial class MainWindow : Window
         {
             string proofread = await Task.Run(() => _foundryService.ProofreadTextAsync(inputText));
 
-            // クリップボードへ校正後のテキストを格納する
-            await TextCaptureAndPasteService.SetClipboardTextSafeAsync(proofread);
-
             // プレイグラウンド出力欄にも反映
             TestInputBox.Text = inputText;
             TestOutputBox.Text = proofread;
+
+            // 書き込み失敗時も結果は画面に残し、完了表示と自動貼り付けは行わない。
+            await TextCaptureAndPasteService.SetClipboardTextSafeAsync(proofread);
 
             // 履歴へ追加して保存
             settings.HistoryItems.Insert(0, new ProofreadHistoryItem
@@ -309,31 +321,35 @@ public partial class MainWindow : Window
             SettingsService.Save();
             RefreshHistoryListUi();
 
-            StatusBannerText.Text = LocalizationService.Instance["StatusCompleted"];
+            bool pasteSkipped = allowAutoPaste &&
+                (pasteTarget == null ||
+                 !await TextCaptureAndPasteService.SendPasteAsync(pasteTarget.Value, proofread));
+            StatusBannerText.Text = LocalizationService.Instance[pasteSkipped ? "StatusAutoPasteSkipped" : "StatusCompleted"];
 
             if (settings.ShowNotification)
             {
-                EnsureToastWindow().ShowCompleted(inputText, proofread);
-            }
-
-            // 自動貼り付けが有効な場合は元のウィンドウへ Ctrl+V を送信する
-            if (allowAutoPaste)
-            {
-                await TextCaptureAndPasteService.SendPasteAsync();
+                EnsureToastWindow().ShowCompleted(inputText, proofread,
+                    pasteSkipped ? LocalizationService.Instance["ToastAutoPasteSkippedTitle"] : null);
             }
         }
         catch (Exception ex)
         {
-            string errMsg = LocalizationService.Instance["StatusError"] + ex.Message;
-            StatusBannerText.Text = errMsg;
-            if (settings.ShowNotification)
-            {
-                EnsureToastWindow().ShowError(errMsg);
-            }
+            ShowProofreadError(ex);
         }
         finally
         {
             GlobalBusyBar.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void ShowProofreadError(Exception ex)
+    {
+        System.Diagnostics.Debug.WriteLine(ex);
+        string message = LocalizationService.Instance["StatusError"] + ex.Message;
+        StatusBannerText.Text = message;
+        if (SettingsService.Current.ShowNotification)
+        {
+            EnsureToastWindow().ShowError(message);
         }
     }
 
@@ -403,8 +419,15 @@ public partial class MainWindow : Window
     {
         if (!string.IsNullOrWhiteSpace(TestOutputBox.Text))
         {
-            await TextCaptureAndPasteService.SetClipboardTextSafeAsync(TestOutputBox.Text);
-            StatusBannerText.Text = LocalizationService.Instance["StatusCompleted"];
+            try
+            {
+                await TextCaptureAndPasteService.SetClipboardTextSafeAsync(TestOutputBox.Text);
+                StatusBannerText.Text = LocalizationService.Instance["StatusCompleted"];
+            }
+            catch (Exception ex)
+            {
+                ShowProofreadError(ex);
+            }
         }
     }
 
@@ -430,8 +453,15 @@ public partial class MainWindow : Window
         {
             TestInputBox.Text = item.OriginalText;
             TestOutputBox.Text = item.ProofreadText;
-            await TextCaptureAndPasteService.SetClipboardTextSafeAsync(item.ProofreadText);
-            StatusBannerText.Text = LocalizationService.Instance["StatusCompleted"];
+            try
+            {
+                await TextCaptureAndPasteService.SetClipboardTextSafeAsync(item.ProofreadText);
+                StatusBannerText.Text = LocalizationService.Instance["StatusCompleted"];
+            }
+            catch (Exception ex)
+            {
+                ShowProofreadError(ex);
+            }
         }
     }
 
@@ -635,6 +665,16 @@ public partial class MainWindow : Window
             QuickAutoPasteCheck.IsChecked = s.AutoPaste;
             ChkShowNotification.IsChecked = s.ShowNotification;
             ChkAutoPaste.IsChecked = s.AutoPaste;
+            try
+            {
+                s.StartWithWindows = StartupService.IsEnabled();
+                ChkStartWithWindows.IsChecked = s.StartWithWindows;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SecurityException or InvalidOperationException)
+            {
+                ChkStartWithWindows.IsEnabled = false;
+                ShowStartupSettingsError(ex);
+            }
             ChkStartMinimized.IsChecked = s.StartMinimized;
             ChkCloseToTray.IsChecked = s.CloseToTray;
 
@@ -774,12 +814,30 @@ public partial class MainWindow : Window
             case "Concise":
                 SystemPromptBox.Text = AppSettings.ConciseSystemPromptJa;
                 break;
+            case "Romaji":
+                SystemPromptBox.Text = AppSettings.RomajiSystemPromptJa;
+                break;
         }
     }
 
     private void BtnSaveSettings_Click(object sender, RoutedEventArgs e)
     {
         var s = SettingsService.Current;
+
+        if (ChkStartWithWindows.IsEnabled)
+        {
+            try
+            {
+                bool startWithWindows = ChkStartWithWindows.IsChecked == true;
+                StartupService.SetEnabled(startWithWindows);
+                s.StartWithWindows = startWithWindows;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SecurityException or COMException or InvalidOperationException)
+            {
+                ShowStartupSettingsError(ex);
+                return;
+            }
+        }
 
         if (_pendingVirtualKey != 0)
         {
@@ -815,6 +873,15 @@ public partial class MainWindow : Window
         StatusBannerText.Text = LocalizationService.Instance["SettingsSavedMsg"];
     }
 
+    private void ShowStartupSettingsError(Exception ex)
+    {
+        System.Diagnostics.Debug.WriteLine(ex);
+        string message = LocalizationService.Instance["StartupSettingsFailed"] + ex.Message;
+        StatusBannerText.Text = message;
+        System.Windows.MessageBox.Show(this, message, LocalizationService.Instance["AppTitle"],
+            MessageBoxButton.OK, MessageBoxImage.Error);
+    }
+
     /// <summary>
     /// 現在の表示言語に合わせて画面上の全ラベル・ボタン文字列を更新する
     /// </summary>
@@ -833,6 +900,7 @@ public partial class MainWindow : Window
         NavSettingsBtn.Content = loc["TabSettings"];
 
         LblTestSectionTitle.Text = loc["TestSectionTitle"];
+        TestInputBox.ToolTip = loc["TestInputPlaceholder"];
         QuickAutoPasteCheck.Content = loc["QuickAutoPaste"];
         BtnRunProofread.Content = loc["BtnRunProofread"];
         BtnCopyResult.Content = loc["BtnCopyResult"];
@@ -857,12 +925,13 @@ public partial class MainWindow : Window
         LblSettingsPromptHeader.Text = loc["SettingsPromptHeader"];
         LblPreset.Text = loc["PresetLabel"];
 
-        if (PresetComboBox.Items.Count >= 4)
+        if (PresetComboBox.Items.Count >= 5)
         {
             ((ComboBoxItem)PresetComboBox.Items[0]).Content = loc["PresetStandard"];
             ((ComboBoxItem)PresetComboBox.Items[1]).Content = loc["PresetBusiness"];
             ((ComboBoxItem)PresetComboBox.Items[2]).Content = loc["PresetConcise"];
             ((ComboBoxItem)PresetComboBox.Items[3]).Content = loc["PresetCustom"];
+            ((ComboBoxItem)PresetComboBox.Items[4]).Content = loc["PresetRomaji"];
         }
 
         LblSystemPrompt.Text = loc["SystemPromptLabel"];
@@ -870,6 +939,7 @@ public partial class MainWindow : Window
         LblSettingsBehaviorHeader.Text = loc["SettingsBehaviorHeader"];
         ChkShowNotification.Content = loc["ChkShowNotification"];
         ChkAutoPaste.Content = loc["ChkAutoPaste"];
+        ChkStartWithWindows.Content = loc["ChkStartWithWindows"];
         ChkStartMinimized.Content = loc["ChkStartMinimized"];
         ChkCloseToTray.Content = loc["ChkCloseToTray"];
         LblLanguage.Text = loc["LanguageLabel"];

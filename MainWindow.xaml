@@ -504,6 +504,7 @@
                                 <ComboBoxItem Tag="Business" Content="ビジネス丁寧語（敬語・メール向け）"/>
                                 <ComboBoxItem Tag="Concise" Content="簡潔・要約（無駄を省く）"/>
                                 <ComboBoxItem Tag="Custom" Content="カスタム指示"/>
+                                <ComboBoxItem Tag="Romaji" Content="ローマ字 → 日本語"/>
                             </ComboBox>
                         </StackPanel>
 
@@ -547,6 +548,7 @@
 
                         <CheckBox x:Name="ChkShowNotification" Content="校正完了時に画面右下にトースト通知を表示する"/>
                         <CheckBox x:Name="ChkAutoPaste" Content="校正完了後に元のウィンドウへ自動貼り付け (Ctrl+V) する"/>
+                        <CheckBox x:Name="ChkStartWithWindows" Content="Windows起動時に自動起動する（サインイン時）"/>
                         <CheckBox x:Name="ChkStartMinimized" Content="アプリ起動時にシステムトレイへ最小化して開始する"/>
                         <CheckBox x:Name="ChkCloseToTray" Content="ウィンドウを閉じる(×)ときに終了せずシステムトレイに常駐する"/>
 

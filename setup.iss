@@ -8,6 +8,8 @@ AppId={{8D4F63B2-9A2E-4C11-8B47-3E92A50C1D01}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
+VersionInfoVersion={#MyAppVersion}
+VersionInfoProductVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\TekitouKeyborad
 DefaultGroupName={#MyAppName}
@@ -27,9 +29,15 @@ ArchitecturesInstallIn64BitMode=x64compatible
 Name: "japanese"; MessagesFile: "compiler:Languages\Japanese.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+[CustomMessages]
+japanese.StartupDescription=Windows 起動時に自動起動する（サインイン時）
+japanese.StartupGroup=スタートアップ登録:
+english.StartupDescription=Start automatically with Windows (at sign-in)
+english.StartupGroup=Startup:
+
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "startup"; Description: "Windows 起動時に自動的に起動する"; GroupDescription: "スタートアップ登録:"; Flags: unchecked
+Name: "startup"; Description: "{cm:StartupDescription}"; GroupDescription: "{cm:StartupGroup}"; Flags: unchecked
 
 [Files]
 Source: "publish\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -39,6 +47,8 @@ Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 Name: "{userstartup}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: startup
 
+[UninstallDelete]
+Type: files; Name: "{userstartup}\{#MyAppName}.lnk"
+
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
-

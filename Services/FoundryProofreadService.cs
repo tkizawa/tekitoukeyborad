@@ -236,14 +236,25 @@ public class FoundryProofreadService : IDisposable
         }
 
         var settings = SettingsService.Current;
-        string systemPrompt = string.IsNullOrWhiteSpace(settings.SystemPrompt)
-            ? Models.AppSettings.DefaultSystemPromptJa
-            : settings.SystemPrompt;
+        bool isRomaji = string.Equals(settings.PromptPreset, "Romaji", StringComparison.OrdinalIgnoreCase);
+        string kanaInput = isRomaji
+            ? RomajiInputService.PrepareForProofreading(inputText)
+            : inputText;
+        string modelInput = isRomaji && !string.Equals(kanaInput, inputText, StringComparison.Ordinal)
+            ? $"ローマ字原文:\n{inputText}\n\nかな読み:\n{kanaInput}"
+            : inputText;
+        string systemPrompt = settings.SystemPrompt;
+        if (string.IsNullOrWhiteSpace(systemPrompt))
+        {
+            systemPrompt = isRomaji
+                ? Models.AppSettings.RomajiSystemPromptJa
+                : Models.AppSettings.DefaultSystemPromptJa;
+        }
 
         // OpenAI互換HTTPエンドポイントモードが選択されている場合
         if (string.Equals(settings.ConnectionMode, "OpenAICompatibleEndpoint", StringComparison.OrdinalIgnoreCase))
         {
-            return await ProofreadViaHttpEndpointAsync(inputText, systemPrompt, settings, ct);
+            return await ProofreadViaHttpEndpointAsync(inputText, modelInput, systemPrompt, settings, ct);
         }
 
         // Foundry Local SDK モード（標準）
@@ -273,7 +284,7 @@ public class FoundryProofreadService : IDisposable
 
         using var request = new Request()
             .AddItem(MessageItem.System(systemPrompt))
-            .AddItem(MessageItem.User(inputText));
+            .AddItem(MessageItem.User(modelInput));
 
         using var response = await session.ProcessRequestAsync(request, ct);
         var sb = new StringBuilder();
@@ -294,6 +305,7 @@ public class FoundryProofreadService : IDisposable
     /// </summary>
     private async Task<string> ProofreadViaHttpEndpointAsync(
         string inputText,
+        string modelInput,
         string systemPrompt,
         Models.AppSettings settings,
         CancellationToken ct)
@@ -305,7 +317,7 @@ public class FoundryProofreadService : IDisposable
             messages = new[]
             {
                 new { role = "system", content = systemPrompt },
-                new { role = "user", content = inputText }
+                new { role = "user", content = modelInput }
             },
             temperature = settings.Temperature,
             max_tokens = settings.MaxTokens

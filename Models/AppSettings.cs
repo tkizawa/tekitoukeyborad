@@ -28,10 +28,10 @@ public class AppSettings
 {
     // --- ウィンドウ位置・サイズの設定 ---
     /// <summary>ウィンドウの左端座標</summary>
-    public double WindowLeft { get; set; } = double.NaN;
+    public double? WindowLeft { get; set; }
 
     /// <summary>ウィンドウの上端座標</summary>
-    public double WindowTop { get; set; } = double.NaN;
+    public double? WindowTop { get; set; }
 
     /// <summary>ウィンドウの幅</summary>
     public double WindowWidth { get; set; } = 920;
@@ -43,6 +43,9 @@ public class AppSettings
     public bool IsMaximized { get; set; } = false;
 
     // --- 常駐・起動動作の設定 ---
+    /// <summary>Windowsへのサインイン時に自動起動するか</summary>
+    public bool StartWithWindows { get; set; } = false;
+
     /// <summary>起動時にシステムトレイへ最小化した状態で開始するか</summary>
     public bool StartMinimized { get; set; } = false;
 
@@ -91,7 +94,7 @@ public class AppSettings
     /// <summary>最大出力トークン数</summary>
     public int MaxTokens { get; set; } = 1024;
 
-    /// <summary>校正プリセットの識別子 ("Standard", "Business", "Concise", "Custom")</summary>
+    /// <summary>校正プリセットの識別子 ("Standard", "Business", "Concise", "Custom", "Romaji")</summary>
     public string PromptPreset { get; set; } = "Standard";
 
     /// <summary>AIに渡すシステムプロンプト（校正指示文）</summary>
@@ -126,5 +129,19 @@ public class AppSettings
         "あなたは文章編集アシスタントです。ユーザーから渡されたテキストの誤字脱字を修正し、冗長な表現を省いて簡潔で分かりやすい文章に整えてください。\n" +
         "【重要なルール】\n" +
         "・校正後のテキストのみを出力し、解説や挨拶、引用符は一切付けないでください。";
-}
 
+    /// <summary>ローマ字の日本語を漢字・かな交じりの日本語に校正するシステムプロンプト</summary>
+    public const string RomajiSystemPromptJa =
+        "あなたは日本語の文章校正アシスタントです。入力は日本語をローマ字（アルファベット）で書いた文章です。意味を読み取り、漢字・ひらがな・カタカナを使った自然な日本語に変換し、誤字脱字や文法も校正してください。\n" +
+        "【重要なルール】\n" +
+        "・入力に「ローマ字原文」と「かな読み」がある場合は両方を参考にし、原文の単語や文脈を使って正しい漢字・文法に直してください。\n" +
+        "・単語間に空白がない入力、ヘボン式・訓令式の違い、日本語とローマ字の混在、軽微な打ち間違いにも対応してください。\n" +
+        "・元の意味やトーン、日時・場所・対象・行為などの情報は省略したり、別の意味に変えたりしないでください。\n" +
+        "・固有名詞・略語・URL・メールアドレス・コードは原文の綴りをそのまま残してください。略語の展開や翻訳はしないでください（VS CodeはVS Codeのまま残す）。\n" +
+        "・校正後の日本語本文だけを出力し、解説や挨拶、引用符、変換前のローマ字文は付けないでください。\n" +
+        "【例】\n" +
+        "watashiwaashitakaiginisankashimasu → 私は明日、会議に参加します。\n" +
+        "yorosiku onegaisimasu → よろしくお願いします。\n" +
+        "asu no kaigi de Windows no settei wo kakunin shimasu → 明日の会議でWindowsの設定を確認します。\n" +
+        "回答は校正後の日本語本文のみです。原文・かな読みのラベルや解説、注釈は絶対に出力しないでください。";
+}
