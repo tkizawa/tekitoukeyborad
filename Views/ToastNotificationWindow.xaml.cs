@@ -73,10 +73,10 @@ public partial class ToastNotificationWindow : Window
     /// <summary>
     /// 「校正完了」状態の通知を表示し、一定時間後に自動で閉じる
     /// </summary>
-    public void ShowCompleted(string originalText, string proofreadText)
+    public void ShowCompleted(string originalText, string proofreadText, string? statusMessage = null)
     {
         _autoCloseTimer.Stop();
-        TitleText.Text = LocalizationService.Instance["ToastCompletedTitle"];
+        TitleText.Text = statusMessage ?? LocalizationService.Instance["ToastCompletedTitle"];
         BusyBar.Visibility = Visibility.Collapsed;
         OriginalPreviewText.Text = $"{LocalizationService.Instance["ToastOriginalLabel"]} {originalText}";
         ResultPreviewText.Text = proofreadText;
@@ -123,4 +123,3 @@ public partial class ToastNotificationWindow : Window
         Hide();
     }
 }
-
